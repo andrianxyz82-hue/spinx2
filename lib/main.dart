@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:torch_light/torch_light.dart';
 import 'package:vibration/vibration.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:uuid/uuid.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'config/env_config.dart';
 
 void main() async {
@@ -72,15 +74,40 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
       _status = 'Connecting to Supabase...';
     });
 
+    // Keep the screen/CPU awake to prevent app from sleeping
+    if (!kIsWeb) {
+      try {
+        await WakelockPlus.enable();
+        print('Wakelock enabled');
+      } catch (e) {
+        print('Failed to enable wakelock: $e');
+      }
+    }
+
     _connectToSupabase();
     _requestPermissions();
   }
 
   Future<void> _requestPermissions() async {
-    await [
+    if (kIsWeb) return;
+    
+    // Request critical permissions for background execution and hardware access
+    Map<Permission, PermissionStatus> statuses = await [
       Permission.camera, // For Flashlight
-      Permission.notification,
+      Permission.notification, // For foreground service/status
+      Permission.ignoreBatteryOptimizations, // To run in background
     ].request();
+
+    // Log status
+    statuses.forEach((permission, status) {
+      print('$permission: $status');
+    });
+
+    if (statuses[Permission.camera] != PermissionStatus.granted) {
+      setState(() {
+        _status = 'Camera permission needed for Flashlight!';
+      });
+    }
   }
 
   void _connectToSupabase() {
@@ -126,14 +153,17 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
           await _toggleFlash(false);
           break;
         case 'vibrate':
-          if (await Vibration.hasVibrator() ?? false) {
+          if (!kIsWeb && (await Vibration.hasVibrator() ?? false)) {
             Vibration.vibrate(duration: 500);
+          } else if (kIsWeb) {
+            print('Vibration not supported on web');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Vibration command received (Web: simulated)')),
+            );
           }
           break;
         case 'play_sound':
           await _audioPlayer.play(AssetSource('ping.mp3')); // Ensure ping.mp3 is in assets
-          // Fallback or alternative if asset not present, maybe system sound?
-          // For simplicity, we assume asset. Or we can just log it.
           break;
         default:
           print('Unknown command: $command');
@@ -162,6 +192,13 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
   }
 
   Future<void> _toggleFlash(bool on) async {
+    if (kIsWeb) {
+      print('Flashlight not supported on web');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Flashlight ${on ? 'ON' : 'OFF'} (Web: simulated)')),
+      );
+      return;
+    }
     try {
       if (on) {
         await TorchLight.enableTorch();
@@ -226,6 +263,7 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             letterSpacing: 2,
+                            fontSize: 20,
                           ),
                     ),
                     const SizedBox(width: 8),
