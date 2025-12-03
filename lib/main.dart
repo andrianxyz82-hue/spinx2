@@ -40,12 +40,14 @@ void main() async {
           channelDescription: 'Keeps the app running to receive remote commands',
           channelImportance: NotificationChannelImportance.LOW,
           priority: NotificationPriority.LOW,
-          icon: const NotificationIcon(
-            metaDataName: 'ic_launcher',
+          iconData: const NotificationIconData(
+            resType: ResourceType.mipmap,
+            resPrefix: ResourcePrefix.ic,
+            name: 'launcher',
           ),
         ),
         iosNotificationOptions: const IOSNotificationOptions(),
-        foregroundTaskOptions: const ForegroundTaskOptions(
+        foregroundTaskOptions: ForegroundTaskOptions(
           eventAction: ForegroundTaskEventAction.repeat(5000),
           autoRunOnBoot: true,
           autoRunOnMyPackageReplaced: true,
@@ -324,13 +326,12 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     }
   }
   
+  
   Future<void> _changeWallpaper() async {
     if (kIsWeb) return;
     
     try {
-      // Set wallpaper from assets
-      // You can put multiple wallpapers and randomly select one
-      // Load asset as bytes and set wallpaper
+      // Load asset as bytes
       final ByteData imageData = await rootBundle.load('assets/wallpapers/1.png');
       final Uint8List bytes = imageData.buffer.asUint8List();
       
@@ -339,21 +340,27 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
       final file = File('${tempDir.path}/wallpaper.png');
       await file.writeAsBytes(bytes);
       
-      // Set wallpaper from file
+      // Set wallpaper from file (async_wallpaper 2.0.1 uses 'url' parameter for file path)
       var result = await AsyncWallpaper.setWallpaper(
-        filePath: file.path,
+        url: file.path,
         wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
         goToHome: false,
-      ) ?? 'Unknown';
+      ) ?? false;
       
       // Clean up temp file
       await file.delete();
       
       print('Wallpaper changed: $result');
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wallpaper changed successfully!')),
-      );
+      if (result) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Wallpaper changed successfully!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to change wallpaper')),
+        );
+      }
     } catch (e) {
       print('Wallpaper Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
