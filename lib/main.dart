@@ -159,15 +159,7 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     final supabase = Supabase.instance.client;
     final channelName = 'device_$_deviceId';
 
-    _channel = supabase.channel(
-      channelName,
-      opts: const RealtimeChannelConfig(
-        broadcast: RealtimeBroadcastConfig(
-          ack: true,
-          self: true,
-        ),
-      ),
-    );
+    _channel = supabase.channel(channelName);
 
     _channel!.onBroadcast(event: 'command', callback: (payload) {
       _handleCommand(payload);
@@ -182,7 +174,7 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
         });
       } else if (status == RealtimeSubscribeStatus.channelError) {
         setState(() {
-          _status = 'Channel Error: ${error?.message ?? "Unknown error"}';
+          _status = 'Channel Error - Check Supabase Realtime settings';
         });
         print('Channel error: $error');
       } else {
