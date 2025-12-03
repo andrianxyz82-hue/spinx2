@@ -9,6 +9,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:uuid/uuid.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:async_wallpaper/async_wallpaper.dart';
 import 'config/env_config.dart';
 
 void main() async {
@@ -17,9 +19,6 @@ void main() async {
   String? initError;
   
   try {
-    // Load environment variables (No longer needed for AppSecrets)
-    // await EnvConfig.initialize();
-    
     // Validate environment configuration
     EnvConfig.validate();
 
@@ -28,6 +27,32 @@ void main() async {
       url: EnvConfig.supabaseUrl,
       anonKey: EnvConfig.supabaseAnonKey,
     );
+    
+    // Initialize foreground service for background execution
+    if (!kIsWeb) {
+      FlutterForegroundTask.init(
+        androidNotificationOptions: AndroidNotificationOptions(
+          channelId: 'remote_receiver_channel',
+          channelName: 'Remote Receiver Service',
+          channelDescription: 'Keeps the app running to receive remote commands',
+          channelImportance: NotificationChannelImportance.LOW,
+          priority: NotificationPriority.LOW,
+          iconData: const NotificationIconData(
+            resType: ResourceType.mipmap,
+            resPrefix: ResourcePrefix.ic,
+            name: 'launcher',
+          ),
+        ),
+        iosNotificationOptions: const IOSNotificationOptions(),
+        foregroundTaskOptions: const ForegroundTaskOptions(
+          interval: 5000,
+          isOnceEvent: false,
+          autoRunOnBoot: true,
+          allowWakeLock: true,
+          allowWifiLock: true,
+        ),
+      );
+    }
   } catch (e) {
     print('Initialization error: $e');
     initError = e.toString();
@@ -127,10 +152,35 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
       } catch (e) {
         print('Failed to enable wakelock: $e');
       }
+      
+      // Start foreground service for background execution
+      await _startForegroundService();
     }
 
     _connectToSupabase();
     _requestPermissions();
+  }
+  
+  Future<void> _startForegroundService() async {
+    if (kIsWeb) return;
+    
+    try {
+      // Request notification permission first (required for Android 13+)
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+      
+      // Start foreground service
+      await FlutterForegroundTask.startService(
+        notificationTitle: 'Remote Receiver Active',
+        notificationText: 'Device ID: $_deviceId - Waiting for commands',
+        callback: startCallback,
+      );
+      
+      print('Foreground service started');
+    } catch (e) {
+      print('Failed to start foreground service: $e');
+    }
   }
 
   Future<void> _requestPermissions() async {
@@ -215,6 +265,16 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
         case 'play_sound':
           await _audioPlayer.play(AssetSource('ping.mp3')); // Ensure ping.mp3 is in assets
           break;
+        case 'change_wallpaper':
+          if (!kIsWeb) {
+            await _changeWallpaper();
+          } else {
+            print('Wallpaper change not supported on web');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Wallpaper change command received (Web: not supported)')),
+            );
+          }
+          break;
         default:
           print('Unknown command: $command');
       }
@@ -260,6 +320,30 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     } catch (e) {
       print('Torch Error: $e');
       // Handle torch unavailable
+    }
+  }
+  
+  Future<void> _changeWallpaper() async {
+    if (kIsWeb) return;
+    
+    try {
+      // Set wallpaper from assets
+      // You can put multiple wallpapers and randomly select one
+      String result = await AsyncWallpaper.setWallpaperFromAsset(
+        assetPath: 'assets/wallpapers/1.png',
+        wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
+      );
+      
+      print('Wallpaper changed: $result');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wallpaper changed successfully!')),
+      );
+    } catch (e) {
+      print('Wallpaper Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to change wallpaper: $e')),
+      );
     }
   }
 
@@ -346,5 +430,35 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
         ),
       ),
     );
+  }
+}
+
+// Foreground task callback handler
+@pragma('vm:entry-point')
+void startCallback() {
+  // This callback runs in an isolate, we can't access UI state here
+  // Just keep the service alive to maintain Supabase connection
+  FlutterForegroundTask.setTaskHandler(MyTaskHandler());
+}
+
+class MyTaskHandler extends TaskHandler {
+  @override
+  void onStart(DateTime timestamp) {
+    print('Foreground task started at $timestamp');
+  }
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {
+    // This runs every 5 seconds (interval set in init)
+    // Keep the service alive
+    FlutterForegroundTask.updateService(
+      notificationTitle: 'Remote Receiver Active',
+      notificationText: 'Listening for commands...',
+    );
+  }
+
+  @override
+  void onDestroy(DateTime timestamp) {
+    print('Foreground task destroyed at $timestamp');
   }
 }
