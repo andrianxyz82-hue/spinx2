@@ -1,30 +1,48 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Configuration class for environment variables
-/// Uses --dart-define or --dart-define-from-file for configuration
+/// Provides secure access to Supabase credentials from .env file
 class EnvConfig {
   /// Supabase project URL
-  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static String get supabaseUrl {
+    final url = dotenv.env['SUPABASE_URL'];
+    if (url == null || url.isEmpty) {
+      throw Exception(
+        'SUPABASE_URL not found in .env file. '
+        'Please ensure .env file exists with required credentials.',
+      );
+    }
+    return url;
+  }
 
   /// Supabase anonymous key
-  static const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  static String get supabaseAnonKey {
+    final key = dotenv.env['SUPABASE_ANON_KEY'];
+    if (key == null || key.isEmpty) {
+      throw Exception(
+        'SUPABASE_ANON_KEY not found in .env file. '
+        'Please ensure .env file exists with required credentials.',
+      );
+    }
+    return key;
+  }
 
   /// Initialize environment configuration
-  /// No async load needed for dart-define
+  /// Must be called before accessing any environment variables
   static Future<void> initialize() async {
-    // No-op for dart-define
+    await dotenv.load(fileName: '.env');
   }
 
   /// Validate that all required environment variables are present
   static void validate() {
-    if (supabaseUrl.isEmpty) {
+    try {
+      // Access all required variables to trigger validation
+      supabaseUrl;
+      supabaseAnonKey;
+    } catch (e) {
       throw Exception(
-        'SUPABASE_URL not found. '
-        'Please run with --dart-define=SUPABASE_URL=... or --dart-define-from-file=.env',
-      );
-    }
-    if (supabaseAnonKey.isEmpty) {
-      throw Exception(
-        'SUPABASE_ANON_KEY not found. '
-        'Please run with --dart-define=SUPABASE_ANON_KEY=... or --dart-define-from-file=.env',
+        'Environment configuration validation failed: $e\n'
+        'Please check your .env file and ensure all required variables are set.',
       );
     }
   }

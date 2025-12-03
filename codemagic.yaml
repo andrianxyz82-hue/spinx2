@@ -27,16 +27,25 @@ workflows:
         script: |
           flutter pub get
       
-      # 2. Build APK with obfuscation (SECURE)
+      # 2. Create .env file from Codemagic environment variables
+      - name: Create .env file
+        script: |
+          echo "Creating .env file from environment variables..."
+          cat > .env <<EOF
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          EOF
+          echo "✅ .env file created"
+          ls -la .env
+      
+      # 3. Build APK with obfuscation (SECURE)
       - name: Build release APK with obfuscation
         script: |
-          echo "Building APK with code obfuscation and dart-define..."
+          echo "Building APK with code obfuscation..."
           flutter build apk \
             --release \
             --obfuscate \
-            --split-debug-info=./debug-info \
-            --dart-define=SUPABASE_URL=$SUPABASE_URL \
-            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+            --split-debug-info=./debug-info
           echo "✅ APK built successfully with obfuscation"
       
       # Optional: Build App Bundle for Play Store
