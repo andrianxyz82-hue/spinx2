@@ -159,7 +159,15 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     final supabase = Supabase.instance.client;
     final channelName = 'device_$_deviceId';
 
-    _channel = supabase.channel(channelName);
+    _channel = supabase.channel(
+      channelName,
+      opts: const RealtimeChannelConfig(
+        broadcast: RealtimeBroadcastConfig(
+          ack: true,
+          self: true,
+        ),
+      ),
+    );
 
     _channel!.onBroadcast(event: 'command', callback: (payload) {
       _handleCommand(payload);
@@ -172,6 +180,11 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
         setState(() {
           _status = 'Disconnected.';
         });
+      } else if (status == RealtimeSubscribeStatus.channelError) {
+        setState(() {
+          _status = 'Channel Error: ${error?.message ?? "Unknown error"}';
+        });
+        print('Channel error: $error');
       } else {
         setState(() {
           _status = 'Connection Status: ${status.name}';
