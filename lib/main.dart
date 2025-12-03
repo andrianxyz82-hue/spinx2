@@ -40,17 +40,12 @@ void main() async {
           channelDescription: 'Keeps the app running to receive remote commands',
           channelImportance: NotificationChannelImportance.LOW,
           priority: NotificationPriority.LOW,
-          iconData: const NotificationIconData(
-            resType: ResourceType.mipmap,
-            resPrefix: ResourcePrefix.ic,
-            name: 'launcher',
-          ),
         ),
         iosNotificationOptions: const IOSNotificationOptions(),
-        foregroundTaskOptions: ForegroundTaskOptions(
-          eventAction: ForegroundTaskEventAction.repeat(5000),
+        foregroundTaskOptions: const ForegroundTaskOptions(
+          interval: 5000,
+          isOnceEvent: false,
           autoRunOnBoot: true,
-          autoRunOnMyPackageReplaced: true,
           allowWakeLock: true,
           allowWifiLock: true,
         ),
