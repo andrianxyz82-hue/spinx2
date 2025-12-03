@@ -36,6 +36,8 @@ workflows:
           SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
           EOF
           echo "✅ .env file created"
+          pwd
+          ls -la
           
       # 3. Verify .env file (without showing credentials)
       - name: Verify .env file exists
