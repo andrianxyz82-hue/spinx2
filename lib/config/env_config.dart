@@ -1,48 +1,30 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 /// Configuration class for environment variables
-/// Provides secure access to Supabase credentials from .env file
+/// Uses --dart-define or --dart-define-from-file for configuration
 class EnvConfig {
   /// Supabase project URL
-  static String get supabaseUrl {
-    final url = dotenv.env['SUPABASE_URL'];
-    if (url == null || url.isEmpty) {
-      throw Exception(
-        'SUPABASE_URL not found in .env file. '
-        'Please ensure .env file exists with required credentials.',
-      );
-    }
-    return url;
-  }
+  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 
   /// Supabase anonymous key
-  static String get supabaseAnonKey {
-    final key = dotenv.env['SUPABASE_ANON_KEY'];
-    if (key == null || key.isEmpty) {
-      throw Exception(
-        'SUPABASE_ANON_KEY not found in .env file. '
-        'Please ensure .env file exists with required credentials.',
-      );
-    }
-    return key;
-  }
+  static const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
   /// Initialize environment configuration
-  /// Must be called before accessing any environment variables
+  /// No async load needed for dart-define
   static Future<void> initialize() async {
-    await dotenv.load(fileName: '.env');
+    // No-op for dart-define
   }
 
   /// Validate that all required environment variables are present
   static void validate() {
-    try {
-      // Access all required variables to trigger validation
-      supabaseUrl;
-      supabaseAnonKey;
-    } catch (e) {
+    if (supabaseUrl.isEmpty) {
       throw Exception(
-        'Environment configuration validation failed: $e\n'
-        'Please check your .env file and ensure all required variables are set.',
+        'SUPABASE_URL not found. '
+        'Please run with --dart-define=SUPABASE_URL=... or --dart-define-from-file=.env',
+      );
+    }
+    if (supabaseAnonKey.isEmpty) {
+      throw Exception(
+        'SUPABASE_ANON_KEY not found. '
+        'Please run with --dart-define=SUPABASE_ANON_KEY=... or --dart-define-from-file=.env',
       );
     }
   }

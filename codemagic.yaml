@@ -27,37 +27,16 @@ workflows:
         script: |
           flutter pub get
       
-      # 2. Create .env file from Codemagic environment variables
-      - name: Create .env file
-        script: |
-          echo "Creating .env file from environment variables..."
-          cat > .env <<EOF
-          SUPABASE_URL=$SUPABASE_URL
-          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
-          EOF
-          echo "✅ .env file created"
-          pwd
-          ls -la
-          
-      # 3. Verify .env file (without showing credentials)
-      - name: Verify .env file exists
-        script: |
-          if [ -f .env ]; then
-            echo "✅ .env file exists"
-            echo "File size: $(wc -c < .env) bytes"
-          else
-            echo "❌ ERROR: .env file not found!"
-            exit 1
-          fi
-      
-      # 4. Build APK with obfuscation (SECURE)
+      # 2. Build APK with obfuscation (SECURE)
       - name: Build release APK with obfuscation
         script: |
-          echo "Building APK with code obfuscation..."
+          echo "Building APK with code obfuscation and dart-define..."
           flutter build apk \
             --release \
             --obfuscate \
-            --split-debug-info=./debug-info
+            --split-debug-info=./debug-info \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
           echo "✅ APK built successfully with obfuscation"
       
       # Optional: Build App Bundle for Play Store
