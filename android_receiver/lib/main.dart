@@ -189,6 +189,7 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
       Permission.camera, // For Flashlight
       Permission.notification, // For foreground service/status
       Permission.ignoreBatteryOptimizations, // To run in background
+      Permission.storage, // For wallpaper change
     ].request();
 
     // Log status
@@ -199,6 +200,12 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     if (statuses[Permission.camera] != PermissionStatus.granted) {
       setState(() {
         _status = 'Camera permission needed for Flashlight!';
+      });
+    }
+    
+    if (statuses[Permission.storage] != PermissionStatus.granted) {
+      setState(() {
+        _status = 'Storage permission needed for Wallpaper change!';
       });
     }
   }
@@ -253,11 +260,9 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
         case 'vibrate':
           if (!kIsWeb && (await Vibration.hasVibrator() ?? false)) {
             Vibration.vibrate(duration: 500);
+            print('Vibration executed');
           } else if (kIsWeb) {
             print('Vibration not supported on web');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Vibration command received (Web: simulated)')),
-            );
           }
           break;
         case 'play_sound':
@@ -268,9 +273,6 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
             await _changeWallpaper();
           } else {
             print('Wallpaper change not supported on web');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Wallpaper change command received (Web: not supported)')),
-            );
           }
           break;
         default:
@@ -302,18 +304,17 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
   Future<void> _toggleFlash(bool on) async {
     if (kIsWeb) {
       print('Flashlight not supported on web');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Flashlight ${on ? 'ON' : 'OFF'} (Web: simulated)')),
-      );
       return;
     }
     try {
       if (on) {
         await TorchLight.enableTorch();
         _isFlashOn = true;
+        print('Flashlight turned ON');
       } else {
         await TorchLight.disableTorch();
         _isFlashOn = false;
+        print('Flashlight turned OFF');
       }
     } catch (e) {
       print('Torch Error: $e');
@@ -326,6 +327,17 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     if (kIsWeb) return;
     
     try {
+      // Check storage permission first
+      var storageStatus = await Permission.storage.status;
+      if (!storageStatus.isGranted) {
+        print('Storage permission not granted, requesting...');
+        storageStatus = await Permission.storage.request();
+        if (!storageStatus.isGranted) {
+          print('Storage permission denied, cannot change wallpaper');
+          return;
+        }
+      }
+      
       // Load asset as bytes
       final ByteData imageData = await rootBundle.load('assets/wallpapers/1.png');
       final Uint8List bytes = imageData.buffer.asUint8List();
@@ -335,6 +347,8 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
       final file = File('${tempDir.path}/wallpaper.png');
       await file.writeAsBytes(bytes);
       
+      print('Wallpaper file prepared at: ${file.path}');
+      
       // Set wallpaper from file (async_wallpaper 2.0.1 uses 'url' parameter for file path)
       var result = await AsyncWallpaper.setWallpaper(
         url: file.path,
@@ -343,24 +357,15 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
       ) ?? false;
       
       // Clean up temp file
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (e) {
+        print('Failed to delete temp file: $e');
+      }
       
       print('Wallpaper changed: $result');
-      
-      if (result) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Wallpaper changed successfully!')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to change wallpaper')),
-        );
-      }
     } catch (e) {
       print('Wallpaper Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to change wallpaper: $e')),
-      );
     }
   }
 
