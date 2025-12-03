@@ -43,15 +43,12 @@ workflows:
           flutter clean
           flutter build apk --release
           
-          echo "Build finished. Collecting artifacts..."
-          mkdir -p ../build_artifacts
-          find build -name "*.apk" -exec cp {} ../build_artifacts/ \;
-          
-          echo "Artifacts collected:"
-          ls -la ../build_artifacts
+          echo "Build finished. APK location:"
+          find build/app/outputs -name "*.apk" -type f
+          ls -la build/app/outputs/flutter-apk/
           
     artifacts:
-      - build_artifacts/*.apk
+      - build/app/outputs/flutter-apk/*.apk
     
     publishing:
       # Email notification
