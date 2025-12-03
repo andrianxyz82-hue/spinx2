@@ -10,74 +10,95 @@ workflows:
         JAVA_HOME: /Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home
       groups:
         - supabase_credentials
-    
+
     scripts:
+      # ================================
+      # 1. FORCE CLEAR PUB CACHE
+      # ================================
+      - name: Force clean Flutter pub cache
+        script: |
+          set -e
+          set -x
+
+          echo "Cleaning Flutter Pub Cache..."
+          rm -rf ~/.pub-cache
+          flutter clean
+
+          echo "Current directory: $(pwd)"
+          if [ ! -f "pubspec.yaml" ] && [ -d "android_receiver" ]; then
+            cd android_receiver
+          fi
+
+          flutter pub get
+
+      # ================================
+      # 2. FIX async_wallpaper namespace
+      # ================================
       - name: Fix async_wallpaper namespace issue
         script: |
           set -e
           set -x
-          
+
           echo "Fixing async_wallpaper namespace compatibility..."
-          
-          # Enter project folder if needed
+
           if [ ! -f "pubspec.yaml" ] && [ -d "android_receiver" ]; then
             cd android_receiver
           fi
-          
-          flutter pub get
-          
+
           PLUGIN_PATH="$HOME/.pub-cache/hosted/pub.dev/async_wallpaper-2.0.1/android"
           WALLPAPER_BUILD_GRADLE="$PLUGIN_PATH/build.gradle"
           MANIFEST_FILE="$PLUGIN_PATH/src/main/AndroidManifest.xml"
-          
+
+          echo "PLUGIN_PATH: $PLUGIN_PATH"
+
           if [ -f "$WALLPAPER_BUILD_GRADLE" ]; then
-            echo "Found async_wallpaper build.gradle at: $WALLPAPER_BUILD_GRADLE"
-            
+            echo "Found build.gradle: $WALLPAPER_BUILD_GRADLE"
+
             if ! grep -q "namespace" "$WALLPAPER_BUILD_GRADLE"; then
               echo "Adding namespace to async_wallpaper build.gradle..."
-              
+
               PACKAGE_NAME=$(sed -n 's/.*package="\([^"]*\)".*/\1/p' "$MANIFEST_FILE")
               if [ -z "$PACKAGE_NAME" ]; then
                 PACKAGE_NAME="com.example.async_wallpaper"
               fi
-              
-              echo "Package name: $PACKAGE_NAME"
-              
-              # Insert namespace (macOS sed)
+
               sed -i '' "/android {/a\\
               namespace '$PACKAGE_NAME'
               " "$WALLPAPER_BUILD_GRADLE"
-              
-              echo "Namespace added successfully!"
+
+              echo "Namespace added: $PACKAGE_NAME"
             else
-              echo "Namespace already exists in build.gradle"
+              echo "Namespace already exists."
             fi
           else
-            echo "WARNING: async_wallpaper build.gradle not found at $PLUGIN_PATH"
+            echo "WARNING: async_wallpaper build.gradle NOT FOUND!"
           fi
-      
+
+      # ================================
+      # 3. BUILD APK RELEASE
+      # ================================
       - name: Build release APK
         script: |
           set -e
           set -x
-          
+
+          echo "Preparing to build..."
           echo "Current directory: $(pwd)"
-          ls -la
-          
+
           if [ ! -f "pubspec.yaml" ] && [ -d "android_receiver" ]; then
             cd android_receiver
           fi
-          
+
           flutter pub get
           flutter clean
           flutter build apk --release
-          
-          echo "Build finished. APK location:"
+
+          echo "APK Build Completed!"
           find build/app/outputs -name "*.apk" -type f
-          
+
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
-    
+
     publishing:
       email:
         recipients:
