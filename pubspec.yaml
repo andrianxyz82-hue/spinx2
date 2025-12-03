@@ -13,13 +13,15 @@ dependencies:
   supabase_flutter: ^2.0.0
   torch_light: ^1.0.0
   vibration: ^3.1.4
-  audioplayers: ^5.2.1
+  audioplayers: 5.2.1
   uuid: ^4.0.0
   permission_handler: ^11.0.0
   wakelock_plus: ^1.4.0
 
-  # versi lama yang cocok untuk kode kamu (API lama)
-  flutter_foreground_task: 8.6.0
+  # VERSI YANG BENAR — API LAMA MASIH ADA ICON, ICONDATA
+  flutter_foreground_task: 8.2.0
+
+  # VERSI LAMA WALLPAPER (yang kamu pakai)
   async_wallpaper: 2.0.1
 
   path_provider: ^2.1.0
