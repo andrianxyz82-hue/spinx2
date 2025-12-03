@@ -14,26 +14,71 @@ import 'config/env_config.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await EnvConfig.initialize();
+  String? initError;
   
-  // Validate environment configuration
-  EnvConfig.validate();
+  try {
+    // Load environment variables (No longer needed for AppSecrets)
+    // await EnvConfig.initialize();
+    
+    // Validate environment configuration
+    EnvConfig.validate();
 
-  // Initialize Supabase with environment variables
-  await Supabase.initialize(
-    url: EnvConfig.supabaseUrl,
-    anonKey: EnvConfig.supabaseAnonKey,
-  );
+    // Initialize Supabase with environment variables
+    await Supabase.initialize(
+      url: EnvConfig.supabaseUrl,
+      anonKey: EnvConfig.supabaseAnonKey,
+    );
+  } catch (e) {
+    print('Initialization error: $e');
+    initError = e.toString();
+  }
 
-  runApp(const MyApp());
+  runApp(MyApp(initError: initError));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String? initError;
+  
+  const MyApp({super.key, this.initError});
 
   @override
   Widget build(BuildContext context) {
+    if (initError != null) {
+      return MaterialApp(
+        title: 'Android Receiver - Error',
+        home: Scaffold(
+          backgroundColor: Colors.red.shade50,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 80, color: Colors.red),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Initialization Failed',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    initError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Please check:\n• .env file exists\n• Supabase credentials are correct\n• Internet connection',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
     return MaterialApp(
       title: 'Android Receiver',
       theme: ThemeData(
