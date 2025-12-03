@@ -22,6 +22,50 @@ workflows:
         - supabase_credentials
     
     scripts:
+      - name: Fix async_wallpaper namespace issue
+        script: |
+          set -e
+          set -x
+          
+          echo "Fixing async_wallpaper namespace compatibility..."
+          
+          # Handle directory structure
+          if [ ! -f "pubspec.yaml" ] && [ -d "android_receiver" ]; then
+            cd android_receiver
+          fi
+          
+          # Get dependencies first
+          flutter pub get
+          
+          # Find async_wallpaper build.gradle
+          WALLPAPER_BUILD_GRADLE="$HOME/.pub-cache/hosted/pub.dev/async_wallpaper-2.1.0/android/build.gradle"
+          
+          if [ -f "$WALLPAPER_BUILD_GRADLE" ]; then
+            echo "Found async_wallpaper build.gradle at: $WALLPAPER_BUILD_GRADLE"
+            
+            # Check if namespace already exists
+            if ! grep -q "namespace" "$WALLPAPER_BUILD_GRADLE"; then
+              echo "Adding namespace to async_wallpaper build.gradle..."
+              
+              # Extract package name from AndroidManifest.xml
+              MANIFEST_FILE="$HOME/.pub-cache/hosted/pub.dev/async_wallpaper-2.1.0/android/src/main/AndroidManifest.xml"
+              PACKAGE_NAME=$(grep -oP 'package="\K[^"]+' "$MANIFEST_FILE" || echo "com.example.async_wallpaper")
+              
+              echo "Package name: $PACKAGE_NAME"
+              
+              # Add namespace after 'android {' line
+              sed -i "/android {/a\\    namespace '$PACKAGE_NAME'" "$WALLPAPER_BUILD_GRADLE"
+              
+              echo "Namespace added successfully!"
+              cat "$WALLPAPER_BUILD_GRADLE"
+            else
+              echo "Namespace already exists in build.gradle"
+            fi
+          else
+            echo "WARNING: async_wallpaper build.gradle not found at expected location"
+            echo "Build may fail if package is not yet cached"
+          fi
+      
       - name: Build release APK
         script: |
           set -e # Exit on error
