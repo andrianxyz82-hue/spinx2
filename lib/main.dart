@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -11,6 +13,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:async_wallpaper/async_wallpaper.dart';
+import 'package:path_provider/path_provider.dart';
 import 'config/env_config.dart';
 
 void main() async {
@@ -37,17 +40,15 @@ void main() async {
           channelDescription: 'Keeps the app running to receive remote commands',
           channelImportance: NotificationChannelImportance.LOW,
           priority: NotificationPriority.LOW,
-          iconData: const NotificationIconData(
-            resType: ResourceType.mipmap,
-            resPrefix: ResourcePrefix.ic,
-            name: 'launcher',
+          icon: const NotificationIcon(
+            metaDataName: 'ic_launcher',
           ),
         ),
         iosNotificationOptions: const IOSNotificationOptions(),
         foregroundTaskOptions: const ForegroundTaskOptions(
-          interval: 5000,
-          isOnceEvent: false,
+          eventAction: ForegroundTaskEventAction.repeat(5000),
           autoRunOnBoot: true,
+          autoRunOnMyPackageReplaced: true,
           allowWakeLock: true,
           allowWifiLock: true,
         ),
@@ -329,10 +330,24 @@ class _ReceiverHomePageState extends State<ReceiverHomePage> {
     try {
       // Set wallpaper from assets
       // You can put multiple wallpapers and randomly select one
-      String result = await AsyncWallpaper.setWallpaperFromAsset(
-        assetPath: 'assets/wallpapers/1.png',
+      // Load asset as bytes and set wallpaper
+      final ByteData imageData = await rootBundle.load('assets/wallpapers/1.png');
+      final Uint8List bytes = imageData.buffer.asUint8List();
+      
+      // Write to temporary file
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/wallpaper.png');
+      await file.writeAsBytes(bytes);
+      
+      // Set wallpaper from file
+      var result = await AsyncWallpaper.setWallpaper(
+        filePath: file.path,
         wallpaperLocation: AsyncWallpaper.HOME_SCREEN,
-      );
+        goToHome: false,
+      ) ?? 'Unknown';
+      
+      // Clean up temp file
+      await file.delete();
       
       print('Wallpaper changed: $result');
       
@@ -458,7 +473,7 @@ class MyTaskHandler extends TaskHandler {
   }
 
   @override
-  void onDestroy(DateTime timestamp) {
+  Future<void> onDestroy(DateTime timestamp) async {
     print('Foreground task destroyed at $timestamp');
   }
 }
