@@ -1,0 +1,89 @@
+workflows:
+  android-receiver-release:
+    name: Android Receiver - Release Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    
+    environment:
+      # Flutter Version
+      flutter: stable
+      
+      # Environment Variables dari Codemagic
+      # Set ini di Codemagic UI: App Settings > Environment Variables
+      vars:
+        # SUPABASE_URL: "https://your-project.supabase.co"
+        # SUPABASE_ANON_KEY: "your_anon_key_here"
+        
+        # Optional: Build configuration
+        JAVA_HOME: /Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home
+      
+      groups:
+        # Jika menggunakan group untuk credentials
+        - supabase_credentials
+    
+    scripts:
+      # 1. Get Flutter dependencies
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      
+      # 2. Create .env file from Codemagic environment variables
+      - name: Create .env file
+        script: |
+          echo "Creating .env file from environment variables..."
+          cat > .env <<EOF
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          EOF
+          echo "✅ .env file created"
+          
+      # 3. Verify .env file (without showing credentials)
+      - name: Verify .env file exists
+        script: |
+          if [ -f .env ]; then
+            echo "✅ .env file exists"
+            echo "File size: $(wc -c < .env) bytes"
+          else
+            echo "❌ ERROR: .env file not found!"
+            exit 1
+          fi
+      
+      # 4. Build APK with obfuscation (SECURE)
+      - name: Build release APK with obfuscation
+        script: |
+          echo "Building APK with code obfuscation..."
+          flutter build apk \
+            --release \
+            --obfuscate \
+            --split-debug-info=./debug-info
+          echo "✅ APK built successfully with obfuscation"
+      
+      # Optional: Build App Bundle for Play Store
+      # - name: Build App Bundle
+      #   script: |
+      #     flutter build appbundle \
+      #       --release \
+      #       --obfuscate \
+      #       --split-debug-info=./debug-info
+    
+    artifacts:
+      # Output APK
+      - build/app/outputs/flutter-apk/*.apk
+      
+      # Debug info untuk crash reporting (JANGAN publish ini!)
+      # - debug-info/**/*
+    
+    publishing:
+      # Email notification
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
+      
+      # Optional: Auto-publish ke Google Play (uncomment jika perlu)
+      # google_play:
+      #   credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+      #   track: internal
+      #   submit_as_draft: true
